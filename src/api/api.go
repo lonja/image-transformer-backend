@@ -24,6 +24,7 @@ func New() *API {
 
 	router.POST("/rotate", handleRotation)
 	router.POST("/resize", handleResize)
+	router.POST("/crop", handleCrop)
 
 	return &API{
 		router: router,
@@ -97,6 +98,49 @@ func handleResize(context echo.Context) error {
 		return err
 	}
 	buffer, err = image.ForceResize(newSize.Width, newSize.Height)
+	if err != nil {
+		return errors.New("error rotating image")
+	}
+	image = bimg.NewImage(buffer)
+	return context.Blob(http.StatusOK, "image/*", image.Image())
+}
+
+/**
+Image crop HTTP handler
+ */
+func handleCrop(context echo.Context) error {
+	form, err := context.MultipartForm()
+	if err != nil {
+		return errors.New("error encoding form")
+	}
+	widthStr, err := valueFromForm(form, "width")
+	if err != nil {
+		return err
+	}
+	heightStr, err := valueFromForm(form, "height")
+	if err != nil {
+		return err
+	}
+	file, size, err := fileFromForm(form, "file")
+	if err != nil {
+		return err
+	}
+	reader := bufio.NewReader(file)
+	var buffer = make([]byte, size)
+	if bytesRead, err := reader.Read(buffer); err != nil || bytesRead == 0 {
+		return errors.New("error reading file")
+	}
+	image := bimg.NewImage(buffer)
+	var newSize *bimg.ImageSize
+	curSize, err := image.Size()
+	if err != nil {
+		return err
+	}
+	newSize, err = parseSize(widthStr, heightStr, curSize)
+	if err != nil {
+		return err
+	}
+	buffer, err = image.Crop(newSize.Width, newSize.Height, bimg.GravityCentre)
 	if err != nil {
 		return errors.New("error rotating image")
 	}
