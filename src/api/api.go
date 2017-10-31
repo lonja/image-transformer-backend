@@ -25,6 +25,8 @@ func New() *API {
 	router.POST("/rotate", handleRotation)
 	router.POST("/resize", handleResize)
 	router.POST("/crop", handleCrop)
+	router.POST("/flip", handleFlip)
+	router.POST("/flop", handleFlop)
 
 	return &API{
 		router: router,
@@ -147,6 +149,59 @@ func handleCrop(context echo.Context) error {
 	image = bimg.NewImage(buffer)
 	return context.Blob(http.StatusOK, "image/*", image.Image())
 }
+
+/**
+Image flip HTTP handler
+ */
+func handleFlip(context echo.Context) error {
+	form, err := context.MultipartForm()
+	if err != nil {
+		return errors.New("error encoding form")
+	}
+	file, size, err := fileFromForm(form, "file")
+	if err != nil {
+		return err
+	}
+	reader := bufio.NewReader(file)
+	var buffer = make([]byte, size)
+	if bytesRead, err := reader.Read(buffer); err != nil || bytesRead == 0 {
+		return errors.New("error reading file")
+	}
+	image := bimg.NewImage(buffer)
+	buffer, err = image.Flip()
+	if err != nil {
+		return errors.New("error rotating image")
+	}
+	image = bimg.NewImage(buffer)
+	return context.Blob(http.StatusOK, "image/*", image.Image())
+}
+
+/**
+Image flop HTTP handler
+ */
+func handleFlop(context echo.Context) error {
+	form, err := context.MultipartForm()
+	if err != nil {
+		return errors.New("error encoding form")
+	}
+	file, size, err := fileFromForm(form, "file")
+	if err != nil {
+		return err
+	}
+	reader := bufio.NewReader(file)
+	var buffer = make([]byte, size)
+	if bytesRead, err := reader.Read(buffer); err != nil || bytesRead == 0 {
+		return errors.New("error reading file")
+	}
+	image := bimg.NewImage(buffer)
+	buffer, err = image.Flop()
+	if err != nil {
+		return errors.New("error rotating image")
+	}
+	image = bimg.NewImage(buffer)
+	return context.Blob(http.StatusOK, "image/*", image.Image())
+}
+
 
 func valueFromForm(form *multipart.Form, key string) (string, error) {
 	values := form.Value[key]
