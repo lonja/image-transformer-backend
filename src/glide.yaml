@@ -1,0 +1,18 @@
+package: .
+import:
+- package: gopkg.in/h2non/bimg.v1
+  version: v1.0.15
+- package: github.com/labstack/echo
+  version: 3.2.3
+- package: github.com/labstack/gommon
+  version: 0.2.3
+- package: github.com/anthonynsimon/bild
+  version: v0.10.0
+  subpackages:
+  - '...'
+- package: github.com/disintegration/imaging
+  version: v1.2.4
+- package: github.com/tj/go-debug
+  version: v2.0.0
+- package: github.com/dgrijalva/jwt-go
+  version: v3.1.0
