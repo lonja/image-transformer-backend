@@ -1,5 +1,5 @@
-hash: 848df3b19d01a5fce470517331f1747ad7bab530abdc2a77cc7c3057c45a2932
-updated: 2017-10-27T21:31:01.554929+03:00
+hash: 6c07413bcfcbda4acc9ae4c979b21a57c5e149f12e4f7e74aca5fa2918c4a8ab
+updated: 2017-11-05T23:41:09.175658+02:00
 imports:
 - name: github.com/anthonynsimon/bild
   version: 35fd1904d43f809ded0959922164885e25577aa2
@@ -35,6 +35,12 @@ imports:
   subpackages:
   - acme
   - acme/autocert
+- name: golang.org/x/image
+  version: f7e31b4ea2e3413ab91b4e7d2dc83e5f8d19a44c
+  subpackages:
+  - bmp
+  - tiff
+  - tiff/lzw
 - name: golang.org/x/sys
   version: ea9bcade75cb975a0b9738936568ab388b845617
   subpackages:

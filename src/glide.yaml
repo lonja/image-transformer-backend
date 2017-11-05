@@ -16,3 +16,6 @@ import:
   version: v2.0.0
 - package: github.com/dgrijalva/jwt-go
   version: v3.1.0
+- package: golang.org/x/image
+  subpackages:
+  - bmp

@@ -4,13 +4,11 @@ import (
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 	"errors"
-	"gopkg.in/h2non/bimg.v1"
 	"net/http"
 	"strconv"
-	"bufio"
-	"mime/multipart"
-	"fmt"
-	"strings"
+	"forms"
+	"model"
+	"images"
 )
 
 type API struct {
@@ -39,32 +37,43 @@ Image rotation HTTP handler
 func handleRotation(context echo.Context) error {
 	form, err := context.MultipartForm()
 	if err != nil {
-		return errors.New("error encoding form")
+		return context.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "error encoding form",
+		})
 	}
-	angleStr, err := valueFromForm(form, "angle")
+	angleStr, err := forms.ValueFromForm(*form, "angle")
 	if err != nil {
-		return err
+		return context.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
 	}
 	angle, err := strconv.Atoi(angleStr)
 	if err != nil {
-		return errors.New("error parsing angle")
+		return context.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "error parsing angle",
+		})
 	}
-	file, size, err := fileFromForm(form, "file")
+	files, err := forms.FilesFromForm(*form, "file")
 	if err != nil {
-		return err
+		return context.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
 	}
-	reader := bufio.NewReader(file)
-	var buffer = make([]byte, size)
-	if bytesRead, err := reader.Read(buffer); err != nil || bytesRead == 0 {
-		return errors.New("error reading file")
+	c := make(chan model.ImageProcessingResponse, len(files))
+	for _, file := range files {
+		go images.ProcessRotation(file, angle, c)
 	}
-	image := bimg.NewImage(buffer)
-	buffer, err = image.Rotate(bimg.Angle(angle))
-	if err != nil {
-		return errors.New("error rotating image")
+	result := model.ImagesProcessingResponse{
+		Items: make([]model.ImageProcessingResponse, len(files)),
 	}
-	image = bimg.NewImage(buffer)
-	return context.Blob(http.StatusOK, "image/*", image.Image())
+	for i := 0; i < len(files); i++ {
+		result.Items[i] = <-c
+	}
+	return context.JSON(http.StatusOK, result)
 }
 
 /**
@@ -73,38 +82,34 @@ Image resize HTTP handler
 func handleResize(context echo.Context) error {
 	form, err := context.MultipartForm()
 	if err != nil {
-		return errors.New("error encoding form")
+		return context.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "error encoding form",
+		})
 	}
-	widthStr, widthErr := valueFromForm(form, "width")
-	heightStr, heightErr := valueFromForm(form, "height")
+	widthStr, widthErr := forms.ValueFromForm(*form, "width")
+	heightStr, heightErr := forms.ValueFromForm(*form, "height")
 	if widthErr != nil && heightErr != nil {
 		return errors.New(`"width" and "height" keys not found`)
 	}
-	file, size, err := fileFromForm(form, "file")
+	files, err := forms.FilesFromForm(*form, "file")
 	if err != nil {
-		return errors.New("error opening file")
+		return context.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
 	}
-	reader := bufio.NewReader(file)
-	var buffer = make([]byte, size)
-	if bytesRead, err := reader.Read(buffer); err != nil || bytesRead == 0 {
-		return errors.New("error reading file")
+	c := make(chan model.ImageProcessingResponse, len(files))
+	for _, file := range files {
+		go images.ProcessResize(file, widthStr, heightStr, c)
 	}
-	image := bimg.NewImage(buffer)
-	var newSize *bimg.ImageSize
-	curSize, err := image.Size()
-	if err != nil {
-		return err
+	result := model.ImagesProcessingResponse{
+		Items: make([]model.ImageProcessingResponse, len(files)),
 	}
-	newSize, err = parseSize(widthStr, heightStr, curSize)
-	if err != nil {
-		return err
+	for i := 0; i < len(files); i++ {
+		result.Items[i] = <-c
 	}
-	buffer, err = image.ForceResize(newSize.Width, newSize.Height)
-	if err != nil {
-		return errors.New("error rotating image")
-	}
-	image = bimg.NewImage(buffer)
-	return context.Blob(http.StatusOK, "image/*", image.Image())
+	return context.JSON(http.StatusOK, result)
 }
 
 /**
@@ -113,41 +118,37 @@ Image crop HTTP handler
 func handleCrop(context echo.Context) error {
 	form, err := context.MultipartForm()
 	if err != nil {
-		return errors.New("error encoding form")
+		return context.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "error encoding form",
+		})
 	}
-	widthStr, err := valueFromForm(form, "width")
+	widthStr, err := forms.ValueFromForm(*form, "width")
 	if err != nil {
 		return err
 	}
-	heightStr, err := valueFromForm(form, "height")
+	heightStr, err := forms.ValueFromForm(*form, "height")
 	if err != nil {
 		return err
 	}
-	file, size, err := fileFromForm(form, "file")
+	files, err := forms.FilesFromForm(*form, "file")
 	if err != nil {
-		return err
+		return context.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
 	}
-	reader := bufio.NewReader(file)
-	var buffer = make([]byte, size)
-	if bytesRead, err := reader.Read(buffer); err != nil || bytesRead == 0 {
-		return errors.New("error reading file")
+	c := make(chan model.ImageProcessingResponse, len(files))
+	for _, file := range files {
+		go images.ProcessCrop(file, widthStr, heightStr, c)
 	}
-	image := bimg.NewImage(buffer)
-	var newSize *bimg.ImageSize
-	curSize, err := image.Size()
-	if err != nil {
-		return err
+	result := model.ImagesProcessingResponse{
+		Items: make([]model.ImageProcessingResponse, len(files)),
 	}
-	newSize, err = parseSize(widthStr, heightStr, curSize)
-	if err != nil {
-		return err
+	for i := 0; i < len(files); i++ {
+		result.Items[i] = <-c
 	}
-	buffer, err = image.Crop(newSize.Width, newSize.Height, bimg.GravityCentre)
-	if err != nil {
-		return errors.New("error rotating image")
-	}
-	image = bimg.NewImage(buffer)
-	return context.Blob(http.StatusOK, "image/*", image.Image())
+	return context.JSON(http.StatusOK, result)
 }
 
 /**
@@ -156,24 +157,29 @@ Image flip HTTP handler
 func handleFlip(context echo.Context) error {
 	form, err := context.MultipartForm()
 	if err != nil {
-		return errors.New("error encoding form")
+		return context.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "error encoding form",
+		})
 	}
-	file, size, err := fileFromForm(form, "file")
+	files, err := forms.FilesFromForm(*form, "file")
 	if err != nil {
-		return err
+		return context.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
 	}
-	reader := bufio.NewReader(file)
-	var buffer = make([]byte, size)
-	if bytesRead, err := reader.Read(buffer); err != nil || bytesRead == 0 {
-		return errors.New("error reading file")
+	c := make(chan model.ImageProcessingResponse, len(files))
+	for _, file := range files {
+		go images.ProcessFlip(file, c)
 	}
-	image := bimg.NewImage(buffer)
-	buffer, err = image.Flip()
-	if err != nil {
-		return errors.New("error rotating image")
+	result := model.ImagesProcessingResponse{
+		Items: make([]model.ImageProcessingResponse, len(files)),
 	}
-	image = bimg.NewImage(buffer)
-	return context.Blob(http.StatusOK, "image/*", image.Image())
+	for i := 0; i < len(files); i++ {
+		result.Items[i] = <-c
+	}
+	return context.JSON(http.StatusOK, result)
 }
 
 /**
@@ -182,115 +188,29 @@ Image flop HTTP handler
 func handleFlop(context echo.Context) error {
 	form, err := context.MultipartForm()
 	if err != nil {
-		return errors.New("error encoding form")
+		return context.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "error encoding form",
+		})
 	}
-	file, size, err := fileFromForm(form, "file")
+	files, err := forms.FilesFromForm(*form, "file")
 	if err != nil {
-		return err
+		return context.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
 	}
-	reader := bufio.NewReader(file)
-	var buffer = make([]byte, size)
-	if bytesRead, err := reader.Read(buffer); err != nil || bytesRead == 0 {
-		return errors.New("error reading file")
+	c := make(chan model.ImageProcessingResponse, len(files))
+	for _, file := range files {
+		go images.ProcessFlop(file, c)
 	}
-	image := bimg.NewImage(buffer)
-	buffer, err = image.Flop()
-	if err != nil {
-		return errors.New("error rotating image")
+	result := model.ImagesProcessingResponse{
+		Items: make([]model.ImageProcessingResponse, len(files)),
 	}
-	image = bimg.NewImage(buffer)
-	return context.Blob(http.StatusOK, "image/*", image.Image())
-}
-
-
-func valueFromForm(form *multipart.Form, key string) (string, error) {
-	values := form.Value[key]
-	if len(values) == 0 {
-		return "", fmt.Errorf(`"%v" key not found`, key)
+	for i := 0; i < len(files); i++ {
+		result.Items[i] = <-c
 	}
-	return form.Value[key][0], nil
-}
-
-func fileFromForm(form *multipart.Form, key string) (multipart.File, int64, error) {
-	files := form.File[key]
-	if len(files) == 0 {
-		return nil, 0, fmt.Errorf(`"%v" key not found`, key)
-	}
-	fileHeader := form.File[key][0]
-	file, err := fileHeader.Open()
-	if err != nil {
-		return nil, 0, errors.New("error opening file")
-	}
-	return file, fileHeader.Size, nil
-}
-
-//TODO: Refactor this shit. This function is too long
-func parseSize(width, height string, oldSize bimg.ImageSize) (*bimg.ImageSize, error) {
-	if width != "" && height == "" {
-		if strings.Contains(width, "px") {
-			widthStr := strings.Split(width, "px")[0]
-			dim, err := strconv.Atoi(widthStr)
-			ratio := float32(dim) / float32(oldSize.Width)
-			return &bimg.ImageSize{
-				Width:  dim,
-				Height: int(ratio * float32(oldSize.Height)),
-			}, err
-		} else if strings.Contains(width, "%") {
-			heightStr := strings.Split(width, "%")[0]
-			dim, err := strconv.Atoi(heightStr)
-			ratio := float32(dim) / 100
-			return &bimg.ImageSize{
-				Width:  int(ratio * float32(oldSize.Width)),
-				Height: int(ratio * float32(oldSize.Height)),
-			}, err
-		}
-		return nil, errors.New("unknown unit")
-	} else if width == "" && height != "" {
-		if strings.Contains(height, "px") {
-			heightStr := strings.Split(height, "px")[0]
-			dim, err := strconv.Atoi(heightStr)
-			ratio := float32(dim) / float32(oldSize.Height)
-			return &bimg.ImageSize{
-				Width:  int(ratio * float32(oldSize.Width)),
-				Height: dim,
-			}, err
-		} else if strings.Contains(width, "%") {
-			heightStr := strings.Split(width, "%")[0]
-			dim, err := strconv.Atoi(heightStr)
-			ratio := float32(dim) / 100
-			return &bimg.ImageSize{
-				Width:  int(ratio * float32(oldSize.Width)),
-				Height: int(ratio * float32(oldSize.Height)),
-			}, err
-		}
-		return nil, errors.New("unknown unit")
-	} else if width != "" && height != "" {
-		if strings.Contains(width, "px") {
-			widthStr := strings.Split(width, "px")[0]
-			widthDim, err := strconv.Atoi(widthStr)
-			heightStr := strings.Split(height, "px")[0]
-			heightDim, err := strconv.Atoi(heightStr)
-			widthRatio := float32(widthDim) / float32(oldSize.Width)
-			heightRatio := float32(heightDim) / float32(oldSize.Height)
-			return &bimg.ImageSize{
-				Width:  int(widthRatio * float32(oldSize.Width)),
-				Height: int(heightRatio * float32(oldSize.Height)),
-			}, err
-		} else if strings.Contains(width, "%") {
-			widthStr := strings.Split(width, "%")[0]
-			widthDim, err := strconv.Atoi(widthStr)
-			heightStr := strings.Split(width, "%")[0]
-			heightDim, err := strconv.Atoi(heightStr)
-			widthRatio := float32(widthDim) / 100
-			heightRatio := float32(heightDim) / 100
-			return &bimg.ImageSize{
-				Width:  int(widthRatio * float32(oldSize.Width)),
-				Height: int(heightRatio * float32(oldSize.Height)),
-			}, err
-		}
-		return nil, errors.New("unknown unit")
-	}
-	return nil, errors.New("empty dimensions")
+	return context.JSON(http.StatusOK, result)
 }
 
 func (api *API) Start(port uint) {
