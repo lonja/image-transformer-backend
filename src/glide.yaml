@@ -19,3 +19,15 @@ import:
 - package: golang.org/x/image
   subpackages:
   - bmp
+- package: github.com/sevenNt/echo-pprof
+- package: github.com/json-iterator/go
+  version: 1.0.3
+- package: github.com/mailru/easyjson
+  subpackages:
+  - '...'
+- package: github.com/parnurzeal/gorequest
+  version: v0.2.15
+- package: github.com/pkg/errors
+  version: v0.8.0
+- package: github.com/moul/http2curl
+- package: github.com/spf13/afero

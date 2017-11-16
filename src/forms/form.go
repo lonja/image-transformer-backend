@@ -4,14 +4,14 @@ import (
 	"mime/multipart"
 	"fmt"
 	"errors"
-	"bufio"
+	"io/ioutil"
 )
 
 type File struct {
-	multipart.File
 	error
-	Name string
-	Size int64
+	Bytes []byte
+	Name  string
+	Size  int64
 }
 
 func ValueFromForm(form multipart.Form, key string) (string, error) {
@@ -20,19 +20,6 @@ func ValueFromForm(form multipart.Form, key string) (string, error) {
 		return "", fmt.Errorf(`"%v" key not found`, key)
 	}
 	return form.Value[key][0], nil
-}
-
-func FileFromForm(form multipart.Form, key string) (multipart.File, int64, error) {
-	files := form.File[key]
-	if len(files) == 0 {
-		return nil, 0, fmt.Errorf(`"%v" key not found`, key)
-	}
-	fileHeader := form.File[key][0]
-	file, err := fileHeader.Open()
-	if err != nil {
-		return nil, 0, errors.New("error opening file")
-	}
-	return file, fileHeader.Size, nil
 }
 
 func FilesFromForm(form multipart.Form, key string) ([]File, error) {
@@ -44,20 +31,21 @@ func FilesFromForm(form multipart.Form, key string) ([]File, error) {
 	for i, file := range files {
 		fileHeader := file
 		file, err := fileHeader.Open()
+		buffer, err := readBytesFromFile(file)
 		parsedFiles[i] = File{
-			File:  file,
+			Bytes: buffer,
 			error: err,
 			Name:  fileHeader.Filename,
 			Size:  fileHeader.Size,
 		}
+		file.Close()
 	}
 	return parsedFiles, nil
 }
 
-func ReadBytesFromFile(file File) ([]byte, error) {
-	reader := bufio.NewReader(file)
-	var buffer = make([]byte, file.Size)
-	if bytesRead, err := reader.Read(buffer); err != nil || bytesRead == 0 {
+func readBytesFromFile(file multipart.File) ([]byte, error) {
+	buffer, err := ioutil.ReadAll(file)
+	if err != nil {
 		return nil, errors.New("error reading file")
 	}
 	return buffer, nil

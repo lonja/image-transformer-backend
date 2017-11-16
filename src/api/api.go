@@ -9,6 +9,8 @@ import (
 	"forms"
 	"model"
 	"images"
+	"github.com/sevenNt/echo-pprof"
+	"file"
 )
 
 type API struct {
@@ -19,12 +21,16 @@ func New() *API {
 	router := echo.New()
 
 	router.Use(middleware.Logger())
+	router.Use(middleware.CORS())
 
 	router.POST("/rotate", handleRotation)
 	router.POST("/resize", handleResize)
 	router.POST("/crop", handleCrop)
 	router.POST("/flip", handleFlip)
 	router.POST("/flop", handleFlop)
+	router.GET("/images/:name", handleImage)
+
+	echopprof.Wrap(router)
 
 	return &API{
 		router: router,
@@ -211,6 +217,10 @@ func handleFlop(context echo.Context) error {
 		result.Items[i] = <-c
 	}
 	return context.JSON(http.StatusOK, result)
+}
+
+func handleImage(context echo.Context) error {
+	return context.File(file.ImageDir + "/" + context.Param("name"))
 }
 
 func (api *API) Start(port uint) {

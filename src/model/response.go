@@ -1,7 +1,12 @@
 package model
 
+type Image struct {
+	URL  string `json:"url,omitempty"`
+	Name string `json:"name"`
+}
+
 type ImageProcessingResponse struct {
-	Image []byte `json:"image,omitempty"`
+	Image        `json:"image,omitempty"`
 	Error string `json:"error,omitempty"`
 }
 
@@ -10,6 +15,6 @@ type ImagesProcessingResponse struct {
 }
 
 type ErrorResponse struct {
-	Code int `json:"status_code"`
+	Code    int    `json:"status_code"`
 	Message string `json:"message"`
 }
