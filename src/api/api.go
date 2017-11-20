@@ -95,6 +95,18 @@ func handleResize(context echo.Context) error {
 	}
 	widthStr, widthErr := forms.ValueFromForm(*form, "width")
 	heightStr, heightErr := forms.ValueFromForm(*form, "height")
+	keepRatStr, _ := forms.ValueFromForm(*form, "keepRatio")
+	var keepRatio bool
+	if keepRatStr == "" {
+		keepRatio = true
+	} else {
+		if keepRatio, err = strconv.ParseBool(keepRatStr); err != nil {
+			return context.JSON(http.StatusBadRequest, model.ErrorResponse{
+				Code:    http.StatusBadRequest,
+				Message: "error parsing keepRatio",
+			})
+		}
+	}
 	if widthErr != nil && heightErr != nil {
 		return errors.New(`"width" and "height" keys not found`)
 	}
@@ -107,7 +119,7 @@ func handleResize(context echo.Context) error {
 	}
 	c := make(chan model.ImageProcessingResponse, len(files))
 	for _, file := range files {
-		go images.ProcessResize(file, widthStr, heightStr, c)
+		go images.ProcessResize(file, widthStr, heightStr, keepRatio, c)
 	}
 	result := model.ImagesProcessingResponse{
 		Items: make([]model.ImageProcessingResponse, len(files)),

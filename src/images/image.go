@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	fs "file"
+	"math"
 )
 
 const backendURL = "http://localhost:8080"
@@ -34,12 +35,12 @@ func ProcessRotation(file forms.File, angle int, c chan model.ImageProcessingRes
 	c <- model.ImageProcessingResponse{
 		Image: model.Image{
 			Name: file.Name,
-			URL: backendURL + url,
+			URL:  backendURL + url,
 		},
 	}
 }
 
-func ProcessResize(file forms.File, width, height string, c chan model.ImageProcessingResponse) {
+func ProcessResize(file forms.File, width, height string, forceResize bool, c chan model.ImageProcessingResponse) {
 	image := bimg.NewImage(file.Bytes)
 	var newSize bimg.ImageSize
 	curSize, err := image.Size()
@@ -49,7 +50,7 @@ func ProcessResize(file forms.File, width, height string, c chan model.ImageProc
 		}
 		return
 	}
-	newSize, err = parseSize(width, height, curSize)
+	newSize, err = ParseSize(width, height, !forceResize, curSize)
 	if err != nil {
 		c <- model.ImageProcessingResponse{
 			Error: err.Error(),
@@ -59,7 +60,8 @@ func ProcessResize(file forms.File, width, height string, c chan model.ImageProc
 	bytes, err := image.Process(bimg.Options{
 		Width:   newSize.Width,
 		Height:  newSize.Height,
-		Force:   true,
+		Force:   forceResize,
+		Embed:   !forceResize,
 		Quality: 100,
 	})
 	if err != nil {
@@ -78,7 +80,7 @@ func ProcessResize(file forms.File, width, height string, c chan model.ImageProc
 	c <- model.ImageProcessingResponse{
 		Image: model.Image{
 			Name: file.Name,
-			URL: backendURL + url,
+			URL:  backendURL + url,
 		},
 	}
 }
@@ -92,7 +94,7 @@ func ProcessCrop(file forms.File, width, height string, c chan model.ImageProces
 			Error: err.Error(),
 		}
 	}
-	newSize, err = parseSize(width, height, curSize)
+	newSize, err = ParseSize(width, height, false, curSize)
 	if err != nil {
 		c <- model.ImageProcessingResponse{
 			Error: err.Error(),
@@ -118,7 +120,7 @@ func ProcessCrop(file forms.File, width, height string, c chan model.ImageProces
 	c <- model.ImageProcessingResponse{
 		Image: model.Image{
 			Name: file.Name,
-			URL: backendURL + url,
+			URL:  backendURL + url,
 		},
 	}
 }
@@ -145,7 +147,7 @@ func ProcessFlip(file forms.File, c chan model.ImageProcessingResponse) {
 	c <- model.ImageProcessingResponse{
 		Image: model.Image{
 			Name: file.Name,
-			URL: backendURL + url,
+			URL:  backendURL + url,
 		},
 	}
 }
@@ -171,76 +173,109 @@ func ProcessFlop(file forms.File, c chan model.ImageProcessingResponse) {
 	c <- model.ImageProcessingResponse{
 		Image: model.Image{
 			Name: file.Name,
-			URL: backendURL + url,
+			URL:  backendURL + url,
 		},
 	}
 }
 
-//TODO: Refactor this shit. This function is too long
-func parseSize(width, height string, oldSize bimg.ImageSize) (bimg.ImageSize, error) {
+func ParseSize(width, height string, keepRatio bool, oldSize bimg.ImageSize) (bimg.ImageSize, error) {
 	if width != "" && height == "" {
-		if strings.Contains(width, "px") {
-			widthStr := strings.Split(width, "px")[0]
-			dim, err := strconv.Atoi(widthStr)
-			ratio := float32(dim) / float32(oldSize.Width)
-			return bimg.ImageSize{
-				Width:  dim,
-				Height: int(ratio * float32(oldSize.Height)),
-			}, err
-		} else if strings.Contains(width, "%") {
-			heightStr := strings.Split(width, "%")[0]
-			dim, err := strconv.Atoi(heightStr)
-			ratio := float32(dim) / 100
-			return bimg.ImageSize{
-				Width:  int(ratio * float32(oldSize.Width)),
-				Height: int(ratio * float32(oldSize.Height)),
-			}, err
-		}
-		return bimg.ImageSize{}, errors.New("unknown unit")
+		return parseWidth(width, oldSize)
 	} else if width == "" && height != "" {
-		if strings.Contains(height, "px") {
-			heightStr := strings.Split(height, "px")[0]
-			dim, err := strconv.Atoi(heightStr)
-			ratio := float32(dim) / float32(oldSize.Height)
-			return bimg.ImageSize{
-				Width:  int(ratio * float32(oldSize.Width)),
-				Height: dim,
-			}, err
-		} else if strings.Contains(width, "%") {
-			heightStr := strings.Split(width, "%")[0]
-			dim, err := strconv.Atoi(heightStr)
-			ratio := float32(dim) / 100
-			return bimg.ImageSize{
-				Width:  int(ratio * float32(oldSize.Width)),
-				Height: int(ratio * float32(oldSize.Height)),
-			}, err
-		}
-		return bimg.ImageSize{}, errors.New("unknown unit")
+		return parseHeight(height, oldSize)
 	} else if width != "" && height != "" {
-		if strings.Contains(width, "px") {
-			widthStr := strings.Split(width, "px")[0]
-			widthDim, err := strconv.Atoi(widthStr)
-			heightStr := strings.Split(height, "px")[0]
-			heightDim, err := strconv.Atoi(heightStr)
-			widthRatio := float32(widthDim) / float32(oldSize.Width)
-			heightRatio := float32(heightDim) / float32(oldSize.Height)
-			return bimg.ImageSize{
-				Width:  int(widthRatio * float32(oldSize.Width)),
-				Height: int(heightRatio * float32(oldSize.Height)),
-			}, err
-		} else if strings.Contains(width, "%") {
-			widthStr := strings.Split(width, "%")[0]
-			widthDim, err := strconv.Atoi(widthStr)
-			heightStr := strings.Split(width, "%")[0]
-			heightDim, err := strconv.Atoi(heightStr)
-			widthRatio := float32(widthDim) / 100
-			heightRatio := float32(heightDim) / 100
-			return bimg.ImageSize{
-				Width:  int(widthRatio * float32(oldSize.Width)),
-				Height: int(heightRatio * float32(oldSize.Height)),
-			}, err
-		}
-		return bimg.ImageSize{}, errors.New("unknown unit")
+		return parseWidthAndHeight(width, height, keepRatio, oldSize)
 	}
 	return bimg.ImageSize{}, errors.New("empty dimensions")
+}
+
+func parseWidth(width string, oldSize bimg.ImageSize) (bimg.ImageSize, error) {
+	if strings.Contains(width, "px") {
+		widthStr := strings.Split(width, "px")[0]
+		dim, err := strconv.Atoi(widthStr)
+		ratio := float32(dim) / float32(oldSize.Width)
+		return bimg.ImageSize{
+			Width:  dim,
+			Height: int(ratio * float32(oldSize.Height)),
+		}, err
+	} else if strings.Contains(width, "%") {
+		heightStr := strings.Split(width, "%")[0]
+		dim, err := strconv.Atoi(heightStr)
+		ratio := float64(dim) / 100
+		return bimg.ImageSize{
+			Width:  round(ratio * float64(oldSize.Width)),
+			Height: round(ratio * float64(oldSize.Height)),
+		}, err
+	}
+	return bimg.ImageSize{}, errors.New("unknown unit")
+}
+
+func parseHeight(height string, oldSize bimg.ImageSize) (bimg.ImageSize, error) {
+	if strings.Contains(height, "px") {
+		heightStr := strings.Split(height, "px")[0]
+		dim, err := strconv.Atoi(heightStr)
+		ratio := float64(dim) / float64(oldSize.Height)
+		return bimg.ImageSize{
+			Width:  round(ratio * float64(oldSize.Width)),
+			Height: dim,
+		}, err
+	} else if strings.Contains(height, "%") {
+		heightStr := strings.Split(height, "%")[0]
+		dim, err := strconv.Atoi(heightStr)
+		ratio := float64(dim) / 100
+		return bimg.ImageSize{
+			Width:  round(ratio * float64(oldSize.Width)),
+			Height: round(ratio * float64(oldSize.Height)),
+		}, err
+	}
+	return bimg.ImageSize{}, errors.New("unknown unit")
+}
+
+func parseWidthAndHeight(width, height string, keepRatio bool, oldSize bimg.ImageSize) (bimg.ImageSize, error) {
+	if strings.Contains(width, "px") {
+		widthStr := strings.Split(width, "px")[0]
+		widthDim, err := strconv.Atoi(widthStr)
+		heightStr := strings.Split(height, "px")[0]
+		heightDim, err := strconv.Atoi(heightStr)
+		if keepRatio {
+			var maxDimRatio float64
+			if oldSize.Width > oldSize.Height {
+				maxDimRatio = float64(widthDim) / float64(oldSize.Width)
+				return bimg.ImageSize{
+					Width:  widthDim,
+					Height: round(maxDimRatio * float64(oldSize.Height)),
+				}, err
+			}
+			maxDimRatio = float64(heightDim) / float64(oldSize.Height)
+			return bimg.ImageSize{
+				Width:  round(maxDimRatio * float64(oldSize.Width)),
+				Height: heightDim,
+			}, err
+		}
+		widthRatio := float64(widthDim) / float64(oldSize.Width)
+		heightRatio := float64(heightDim) / float64(oldSize.Height)
+		return bimg.ImageSize{
+			Width:  round(widthRatio * float64(oldSize.Width)),
+			Height: round(heightRatio * float64(oldSize.Height)),
+		}, err
+	} else if strings.Contains(width, "%") {
+		widthStr := strings.Split(width, "%")[0]
+		widthDim, err := strconv.Atoi(widthStr)
+		heightStr := strings.Split(width, "%")[0]
+		heightDim, err := strconv.Atoi(heightStr)
+		widthRatio := float64(widthDim) / 100
+		heightRatio := float64(heightDim) / 100
+		return bimg.ImageSize{
+			Width:  round(widthRatio * float64(oldSize.Width)),
+			Height: round(heightRatio * float64(oldSize.Height)),
+		}, err
+	}
+	return bimg.ImageSize{}, errors.New("unknown unit")
+}
+
+func round(f float64) int {
+	if math.Abs(f) < 0.5 {
+		return 0
+	}
+	return int(f + math.Copysign(0.5, f))
 }
