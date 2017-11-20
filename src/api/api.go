@@ -95,6 +95,12 @@ func handleResize(context echo.Context) error {
 	}
 	widthStr, widthErr := forms.ValueFromForm(*form, "width")
 	heightStr, heightErr := forms.ValueFromForm(*form, "height")
+	if heightStr == widthStr && widthStr == "" {
+		return context.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "both width and height not specified",
+		})
+	}
 	keepRatStr, _ := forms.ValueFromForm(*form, "keepRatio")
 	var keepRatio bool
 	if keepRatStr == "" {
@@ -148,6 +154,12 @@ func handleCrop(context echo.Context) error {
 	heightStr, err := forms.ValueFromForm(*form, "height")
 	if err != nil {
 		return err
+	}
+	if heightStr == widthStr && widthStr == "" {
+		return context.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Code:    http.StatusBadRequest,
+			Message: "both width and height not specified",
+		})
 	}
 	files, err := forms.FilesFromForm(*form, "file")
 	if err != nil {

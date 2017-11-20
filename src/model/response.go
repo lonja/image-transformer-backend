@@ -2,11 +2,11 @@ package model
 
 type Image struct {
 	URL  string `json:"url,omitempty"`
-	Name string `json:"name"`
+	Name string `json:"name,omitempty"`
 }
 
 type ImageProcessingResponse struct {
-	Image        `json:"image,omitempty"`
+	Image Image  `json:"image,omitempty"`
 	Error string `json:"error,omitempty"`
 }
 
