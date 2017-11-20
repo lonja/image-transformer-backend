@@ -40,7 +40,7 @@ func ProcessRotation(file forms.File, angle int, c chan model.ImageProcessingRes
 	}
 }
 
-func ProcessResize(file forms.File, width, height string, forceResize bool, c chan model.ImageProcessingResponse) {
+func ProcessResize(file forms.File, width, height string, keepRatio bool, c chan model.ImageProcessingResponse) {
 	image := bimg.NewImage(file.Bytes)
 	var newSize bimg.ImageSize
 	curSize, err := image.Size()
@@ -50,7 +50,7 @@ func ProcessResize(file forms.File, width, height string, forceResize bool, c ch
 		}
 		return
 	}
-	newSize, err = ParseSize(width, height, !forceResize, curSize)
+	newSize, err = ParseSize(width, height, keepRatio, curSize)
 	if err != nil {
 		c <- model.ImageProcessingResponse{
 			Error: err.Error(),
@@ -60,8 +60,8 @@ func ProcessResize(file forms.File, width, height string, forceResize bool, c ch
 	bytes, err := image.Process(bimg.Options{
 		Width:   newSize.Width,
 		Height:  newSize.Height,
-		Force:   forceResize,
-		Embed:   !forceResize,
+		Force:   !keepRatio,
+		Embed:   keepRatio,
 		Quality: 100,
 	})
 	if err != nil {
