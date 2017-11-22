@@ -86,28 +86,34 @@ func Test_handleRotation(t *testing.T) {
 			w := multipart.NewWriter(&b)
 			fw, err := w.CreateFormField("angle")
 			if err != nil {
+				t.Fail()
 				return
 			}
 			if _, err = fw.Write([]byte(tt.args.angle)); err != nil {
+				t.Fail()
 				return
 			}
 			for _, file := range tt.args.files {
 				f, err := os.Open(file)
 				if err != nil {
+					t.Fail()
 					return
 				}
 				defer f.Close()
 				fw, err = w.CreateFormFile("file", file)
 				if err != nil {
+					t.Fail()
 					return
 				}
 				if _, err = io.Copy(fw, f); err != nil {
+					t.Fail()
 					return
 				}
 			}
 			w.Close()
 			req, err := http.NewRequest("POST", baseURL+"/rotate", &b)
 			if err != nil {
+				t.Fail()
 				return
 			}
 			req.Header.Set("Content-Type", w.FormDataContentType())
@@ -115,9 +121,10 @@ func Test_handleRotation(t *testing.T) {
 			resp, err := client.Do(req)
 			endTime := time.Now().UnixNano()
 			if err != nil {
+				t.Fail()
 				return
 			}
-			t.Logf(`request "%v" processing duration: %v sec`, tt.name, float32((endTime - startTime))/1000000000)
+			t.Logf(`request "%v" processing duration: %v sec`, tt.name, float32(endTime-startTime)/1000000000)
 			if resp.StatusCode != tt.wantStatus || err != nil {
 				t.Errorf("rotation error, expected status %v, having status %v", tt.wantStatus, resp.StatusCode)
 			}
@@ -264,7 +271,7 @@ func Test_handleResize(t *testing.T) {
 			startTime := time.Now().UnixNano()
 			resp, err := client.Do(req)
 			endTime := time.Now().UnixNano()
-			t.Logf(`request "%v" processing duration: %v sec`, tt.name, float32((endTime - startTime))/1000000000)
+			t.Logf(`request "%v" processing duration: %v sec`, tt.name, float32(endTime-startTime)/1000000000)
 			if err != nil {
 				t.Fail()
 				return
@@ -396,7 +403,7 @@ func Test_handleCrop(t *testing.T) {
 				t.Fail()
 				return
 			}
-			t.Logf(`request "%v" processing duration: %v sec`, tt.name, float32((endTime - startTime))/1000000000)
+			t.Logf(`request "%v" processing duration: %v sec`, tt.name, float32(endTime-startTime)/1000000000)
 			if resp.StatusCode != tt.wantStatus || err != nil {
 				t.Errorf("crop error, expected status %v, having status %v", tt.wantStatus, resp.StatusCode)
 			}
@@ -481,7 +488,7 @@ func Test_handleFlip(t *testing.T) {
 				t.Fail()
 				return
 			}
-			t.Logf(`request "%v" processing duration: %v sec`, tt.name, float32((endTime - startTime))/1000000000)
+			t.Logf(`request "%v" processing duration: %v sec`, tt.name, float32(endTime-startTime)/1000000000)
 			if resp.StatusCode != tt.wantStatus || err != nil {
 				t.Errorf("flip error, expected status %v, having status %v", tt.wantStatus, resp.StatusCode)
 			}
@@ -566,7 +573,7 @@ func Test_handleFlop(t *testing.T) {
 				t.Fail()
 				return
 			}
-			t.Logf(`request "%v" processing duration: %v sec`, tt.name, float32((endTime - startTime))/1000000000)
+			t.Logf(`request "%v" processing duration: %v sec`, tt.name, float32(endTime-startTime)/1000000000)
 			if resp.StatusCode != tt.wantStatus || err != nil {
 				t.Errorf("flop error, expected status %v, having status %v", tt.wantStatus, resp.StatusCode)
 			}
